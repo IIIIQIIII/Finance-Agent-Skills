@@ -361,6 +361,100 @@ For routing within specific subagents, include routing instructions at the begin
 Please analyze this complex codebase architecture...
 ```
 
+### Dynamic Model Switching in Python Scripts
+
+**The `<CCR-SUBAGENT-MODEL>` tag works perfectly for programmatic access!**
+
+This allows Python scripts to dynamically route to specific models without changing global configuration.
+
+#### Method 1: Direct HTTP API
+
+```python
+import requests
+
+def call_with_model(prompt: str, model: str = "provider,model-name"):
+    """Send request to router with dynamic model selection"""
+
+    payload = {
+        "model": "claude-sonnet-4-5",  # Placeholder
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": prompt}],
+        "system": [
+            {"type": "text", "text": "You are a helpful assistant."},
+            {"type": "text", "text": f"<CCR-SUBAGENT-MODEL>{model}</CCR-SUBAGENT-MODEL>"}
+        ]
+    }
+
+    response = requests.post(
+        "http://127.0.0.1:3456/v1/messages",
+        json=payload,
+        headers={
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01"
+        }
+    )
+
+    return response.json()
+
+# Use different models per request
+result1 = call_with_model("Analyze this", model="fast-provider,fast-model")
+result2 = call_with_model("Complex task", model="powerful-provider,powerful-model")
+```
+
+#### Method 2: Claude Agent SDK
+
+**The SDK fully supports dynamic routing through the router!**
+
+```python
+import anyio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def call_with_sdk(prompt: str, model: str = "provider,model-name"):
+    """Use Claude Agent SDK with dynamic model routing"""
+
+    # Include model routing in system prompt
+    system_prompt = f"""<CCR-SUBAGENT-MODEL>{model}</CCR-SUBAGENT-MODEL>
+You are a helpful assistant."""
+
+    options = ClaudeAgentOptions(
+        system_prompt=system_prompt,
+        max_turns=1
+    )
+
+    response_text = ""
+    async for message in query(prompt=prompt, options=options):
+        if hasattr(message, 'content'):
+            for block in message.content:
+                if hasattr(block, 'text'):
+                    response_text += block.text
+
+    return response_text
+
+# Use in async context
+async def main():
+    # Different models for different tasks
+    result1 = await call_with_sdk("Quick task", model="fast-provider,fast-model")
+    result2 = await call_with_sdk("Complex reasoning", model="powerful-provider,powerful-model")
+
+anyio.run(main)
+```
+
+**Key Advantages:**
+- ✅ No global config changes - default routes stay unchanged
+- ✅ Per-request model selection
+- ✅ Works with restricted API keys (bypasses provider restrictions)
+- ✅ Supports both HTTP and SDK approaches
+- ✅ Transparent to the end model (tag is stripped)
+
+#### Complete Example: Sentiment Analysis
+
+For practical implementation examples, search for:
+- `sentiment_analysis.py` - HTTP API approach
+- `sentiment_analysis_sdk.py` - Claude Agent SDK approach
+- `demo_comparison.py` - Side-by-side comparison
+
+These demonstrate production-ready dynamic routing with error handling, cost tracking, and batch processing.
+
 ---
 
 # Operational Excellence
@@ -568,6 +662,215 @@ jobs:
 
 ---
 
+# Python Integration Patterns
+
+## 🐍 Using Claude Code Router in Python Applications
+
+### Architecture Overview
+
+Claude Code Router can be integrated into Python applications in two ways:
+
+```
+Method 1: Direct HTTP API
+┌─────────────────┐
+│ Python Script   │
+│ (requests lib)  │
+└────────┬────────┘
+         │ HTTP POST /v1/messages
+         ↓
+┌─────────────────┐
+│ Claude Code     │
+│ Router          │
+│ (localhost:3456)│
+└────────┬────────┘
+         │ Route based on <CCR-SUBAGENT-MODEL>
+         ↓
+┌─────────────────┐
+│ LLM Provider    │
+│ (various models)│
+│  Claude, etc)   │
+└─────────────────┘
+
+Method 2: Claude Agent SDK
+┌─────────────────┐
+│ Python Script   │
+│ (claude-agent-  │
+│  sdk)           │
+└────────┬────────┘
+         │ SDK API
+         ↓
+┌─────────────────┐
+│ Claude CLI      │
+│ (claude code)   │
+└────────┬────────┘
+         │ HTTP
+         ↓
+┌─────────────────┐
+│ Claude Code     │
+│ Router          │
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│ LLM Provider    │
+└─────────────────┘
+```
+
+### Comparison: HTTP vs SDK
+
+| Aspect | Direct HTTP | Claude Agent SDK |
+|--------|------------|------------------|
+| **Setup** | `pip install requests` | `pip install claude-agent-sdk` |
+| **Dependencies** | Minimal | Medium |
+| **Type Safety** | Manual | Built-in |
+| **Cost Tracking** | Manual (tokens) | Automatic ($) |
+| **Streaming** | Manual | Built-in |
+| **Interactive Sessions** | No | Yes |
+| **Tool Use** | Manual | Built-in |
+| **Best For** | Quick scripts | Production apps |
+
+### Production Best Practices
+
+#### 1. Error Handling
+```python
+import requests
+from typing import Optional
+
+class RouterClient:
+    def __init__(self, base_url: str = "http://127.0.0.1:3456"):
+        self.base_url = base_url
+
+    def call(self, prompt: str, model: str, max_retries: int = 3) -> Optional[dict]:
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    f"{self.base_url}/v1/messages",
+                    json={
+                        "model": "placeholder",
+                        "max_tokens": 1024,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "system": [
+                            {"type": "text", "text": "You are helpful."},
+                            {"type": "text", "text": f"<CCR-SUBAGENT-MODEL>{model}</CCR-SUBAGENT-MODEL>"}
+                        ]
+                    },
+                    headers={"Content-Type": "application/json"},
+                    timeout=30
+                )
+                response.raise_for_status()
+                return response.json()
+            except requests.RequestException as e:
+                if attempt == max_retries - 1:
+                    raise
+                continue
+```
+
+#### 2. Cost Optimization
+```python
+# Use cheaper models for simple tasks
+def route_by_complexity(prompt: str) -> str:
+    """Smart routing based on task complexity"""
+
+    # Quick tasks → fast/cheap model
+    if len(prompt) < 100 and not any(kw in prompt.lower()
+                                     for kw in ['analyze', 'complex', 'detail']):
+        return "fast-provider,fast-model"
+
+    # Complex reasoning → powerful model
+    elif any(kw in prompt.lower()
+            for kw in ['reasoning', 'analyze', 'complex']):
+        return "powerful-provider,powerful-model"
+
+    # Default
+    return "default-provider,default-model"
+
+# Usage
+model = route_by_complexity(user_prompt)
+result = client.call(user_prompt, model=model)
+```
+
+#### 3. Batch Processing
+```python
+import anyio
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+
+async def batch_process(items: list[str], model: str = "provider,model-name"):
+    """Process multiple items with context preservation"""
+
+    system_prompt = f"""<CCR-SUBAGENT-MODEL>{model}</CCR-SUBAGENT-MODEL>
+Process each item I provide."""
+
+    options = ClaudeAgentOptions(
+        system_prompt=system_prompt,
+        max_turns=len(items) * 2
+    )
+
+    results = []
+    async with ClaudeSDKClient(options=options) as client:
+        for item in items:
+            await client.query(item)
+
+            response_text = ""
+            async for msg in client.receive_response():
+                # Process response
+                pass
+
+            results.append(response_text)
+
+    return results
+```
+
+#### 4. Configuration Management
+```python
+import os
+from dataclasses import dataclass
+
+@dataclass
+class RouterConfig:
+    """Centralized router configuration"""
+    base_url: str = "http://127.0.0.1:3456"
+    default_model: str = "provider,model-name"
+    cheap_model: str = "cheap-provider,cheap-model"
+    powerful_model: str = "powerful-provider,powerful-model"
+    timeout: int = 30
+    max_retries: int = 3
+
+    @classmethod
+    def from_env(cls):
+        """Load config from environment variables"""
+        return cls(
+            base_url=os.getenv("ROUTER_URL", cls.base_url),
+            default_model=os.getenv("DEFAULT_MODEL", cls.default_model),
+            timeout=int(os.getenv("ROUTER_TIMEOUT", cls.timeout))
+        )
+
+config = RouterConfig.from_env()
+```
+
+### Real-World Example Pattern
+
+A complete sentiment analysis implementation can serve as a template, demonstrating:
+- ✓ Dynamic model switching with `<CCR-SUBAGENT-MODEL>`
+- ✓ Error handling and retries
+- ✓ Cost tracking (tokens and USD)
+- ✓ Batch processing
+- ✓ Type safety (SDK version)
+- ✓ Both HTTP and SDK approaches side-by-side
+
+**Recommended file structure:**
+```
+project/
+├── sentiment_analysis.py          # HTTP API version
+├── sentiment_analysis_sdk.py      # SDK version
+├── demo_comparison.py            # Performance comparison
+├── test_sdk.py                   # Quick tests
+├── requirements.txt              # Dependencies
+├── setup_uv.sh                   # Environment setup
+└── README.md                     # Documentation
+```
+
+---
+
 # Troubleshooting Guide
 
 ## 🐛 Common Issues & Solutions
@@ -605,6 +908,42 @@ cat ~/.claude-code-router/config.json | json_pp
 
 # Use the UI for validation
 ccr ui
+```
+
+**Issue: "403 Forbidden" or "Client not allowed"**
+```python
+# Problem: Some providers restrict API keys to official Claude Code client
+# Solution: Use dynamic model switching instead of changing global config
+
+# ✓ Correct: Use <CCR-SUBAGENT-MODEL> tag in requests
+# This routes to a different model without changing defaults
+
+# Example in Python:
+system = [
+    {"type": "text", "text": "Your system prompt"},
+    {"type": "text", "text": "<CCR-SUBAGENT-MODEL>provider,model-name</CCR-SUBAGENT-MODEL>"}
+]
+```
+
+**Issue: "No content in response" with OpenAI-compatible APIs**
+```json
+// Problem: Wrong transformer configuration
+// Solution: For OpenAI-compatible APIs, omit transformer
+
+// ✓ Correct - No transformer specified
+{
+  "name": "provider-name",
+  "api_base_url": "https://api.provider.com/v1/chat/completions",
+  "api_key": "$PROVIDER_API_KEY",
+  "models": ["model-name"]
+  // Don't add transformer - router handles conversion automatically!
+}
+
+// ✗ Incorrect - Don't use Anthropic transformer for OpenAI-compatible APIs
+{
+  "name": "provider-name",
+  "transformer": { "use": ["Anthropic"] }  // This causes issues!
+}
 ```
 
 **Issue: Environment variable interpolation not working**
