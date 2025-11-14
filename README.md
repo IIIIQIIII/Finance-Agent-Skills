@@ -11,6 +11,7 @@ A collection of skills for financial AI agents and analysis workflows.
 - **claude-agent-sdk-python-skills** - Expert guide for building applications with the Claude Agent SDK for Python, including custom tools (in-process MCP servers), hooks, and automated workflows
 - **qwen-embedding-skills** - Text vectorization and semantic analysis using Alibaba Cloud DashScope's text-embedding-v4 model (semantic search, recommendation systems, text clustering, zero-shot classification, anomaly detection, hybrid search)
 - **vllm-skills** - Fast LLM inference and serving using vLLM with PagedAttention optimization (model deployment, distributed inference, OpenAI-compatible API, multi-modal models, LoRA adapters)
+- **langchain-skills** - Expert guidance for building applications with LangChain, LangGraph, and LangSmith SDKs (agents, tools, RAG, streaming, structured output, memory management, production deployment)
 
 ## Usage
 
