@@ -14,6 +14,7 @@ A collection of skills for financial AI agents and analysis workflows.
 - **langchain-skills** - Expert guidance for building applications with LangChain, LangGraph, and LangSmith SDKs (agents, tools, RAG, streaming, structured output, memory management, production deployment)
 - **sentence-segmentation-skills** - Python toolkit for sentence segmentation with unified API supporting NLTK, spaCy, PySBD, and Stanza frameworks (text preprocessing, sentence tokenization, document splitting)
 - **finllm-skills** - Financial NLP toolkit with 5 tasks (FPB sentiment, FiQA entity sentiment, Headline classification, NER, FLS detection) across 3 LLM providers (Qwen, Kimi, GLM). Supports dual prompt strategy (short/long), numerical confidence scoring, and pip-installable package structure
+- **sec-api-python-skills** - Access and analyze SEC EDGAR filings data using comprehensive APIs for searching, downloading, parsing financial statements, insider trading, institutional holdings, and extracting structured data from 10-K, 10-Q, 8-K and other SEC forms
 
 ## Usage
 
